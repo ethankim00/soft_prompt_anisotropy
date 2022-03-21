@@ -28,9 +28,7 @@ parser.add_argument(
     default="t5-lm",
     help="We test both t5 and t5-lm in this scripts, the corresponding tokenizerwrapper will be automatically loaded.",
 )
-parser.add_argument(
-    "--model_name_or_path", default="../../plm_cache/t5-large-lm-adapt/"
-)
+parser.add_argument("--model_name_or_path", default="t5-large-lm-adapt")
 parser.add_argument(
     "--project_root",
     default="/mnt/sfs_turbo/hsd/OpenPrompt_official/OpenPrompt/",
