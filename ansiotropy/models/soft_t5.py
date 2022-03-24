@@ -28,18 +28,18 @@ parser.add_argument(
     default="t5-lm",
     help="We test both t5 and t5-lm in this scripts, the corresponding tokenizerwrapper will be automatically loaded.",
 )
-parser.add_argument("--model_name_or_path", default="t5-large-lm-adapt")
+parser.add_argument("--model_name_or_path", default="t5-large")
 parser.add_argument(
     "--project_root",
     default="/mnt/sfs_turbo/hsd/OpenPrompt_official/OpenPrompt/",
     help="The project root in the file system, i.e. the absolute path of OpenPrompt",
 )
-parser.add_argument("--template_id", type=int)
-parser.add_argument("--verbalizer_id", type=int)
+parser.add_argument("--template_id", default=0, type=int)
+parser.add_argument("--verbalizer_id", default=0, type=int)
 parser.add_argument(
     "--data_dir", type=str, default="/mnt/sfs_turbo/huggingface_datasets/"
 )  # sometimes, huggingface datasets can not be automatically downloaded due to network issue, please refer to 0_basic.py line 15 for solutions.
-parser.add_argument("--dataset", type=str)
+parser.add_argument("--dataset", default="boolq", type=str)
 parser.add_argument("--result_file", type=str, default="../sfs_out/results.txt")
 parser.add_argument("--max_steps", default=20000, type=int)
 parser.add_argument("--prompt_lr", type=float, default=0.3)
