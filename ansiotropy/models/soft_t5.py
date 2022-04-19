@@ -28,24 +28,24 @@ parser.add_argument(
     default="t5-lm",
     help="We test both t5 and t5-lm in this scripts, the corresponding tokenizerwrapper will be automatically loaded.",
 )
-parser.add_argument("--model_name_or_path", default="t5-large")
+parser.add_argument("--model_name_or_path", default="t5-base")
 parser.add_argument(
     "--project_root",
-    default="/mnt/sfs_turbo/hsd/OpenPrompt_official/OpenPrompt/",
+    default="/",
     help="The project root in the file system, i.e. the absolute path of OpenPrompt",
 )
 parser.add_argument("--template_id", default=0, type=int)
 parser.add_argument("--verbalizer_id", default=0, type=int)
 parser.add_argument(
-    "--data_dir", type=str, default="/mnt/sfs_turbo/huggingface_datasets/"
+    "--data_dir", type=str, default="./data/"
 )  # sometimes, huggingface datasets can not be automatically downloaded due to network issue, please refer to 0_basic.py line 15 for solutions.
 parser.add_argument("--dataset", default="boolq", type=str)
-parser.add_argument("--result_file", type=str, default="../sfs_out/results.txt")
+parser.add_argument("--result_file", type=str, default="../results.txt")
 parser.add_argument("--max_steps", default=20000, type=int)
 parser.add_argument("--prompt_lr", type=float, default=0.3)
 parser.add_argument("--warmup_step_prompt", type=int, default=500)
 parser.add_argument("--init_from_vocab", action="store_false")
-parser.add_argument("--eval_every_steps", type=int, default=500)
+parser.add_argument("--eval_every_steps", type=int, default=5)
 parser.add_argument("--soft_token_num", type=int, default=20)
 parser.add_argument("--optimizer", type=str, default="Adafactor")
 args = parser.parse_args()
@@ -447,12 +447,17 @@ pbar_update_freq = 10
 prompt_model.train()
 
 pbar = tqdm(total=tot_step, desc="Train")
-for epoch in range(1000000):
+for epoch in range(10):
     print(f"Begin epoch {epoch}")
     for step, inputs in enumerate(train_dataloader):
         if use_cuda:
             inputs = inputs.cuda()
         tot_train_time -= time.time()
+        batch = prompt_model.template.process_batch(inputs)
+        batch = {key: batch[key] for key in batch if key in prompt_model.prompt_model.forward_keys}
+        outputs = prompt_model.plm(**batch,output_hidden_states=True)
+        print(outputs.encoder_hidden_states)
+        print(outputs.encoder_hidden_states[0].shape)
         logits = prompt_model(inputs)
         labels = inputs["label"]
         loss = loss_func(logits, labels)
@@ -488,10 +493,11 @@ for epoch in range(1000000):
             and glb_step % args.eval_every_steps == 0
         ):
             val_acc = evaluate(prompt_model, validation_dataloader, desc="Valid")
+            print(val_acc)
             if val_acc >= best_val_acc:
                 torch.save(
                     prompt_model.state_dict(),
-                    f"{args.project_root}/../ckpts/{this_run_unicode}.ckpt",
+                    f".{args.project_root}{this_run_unicode}.ckpt",
                 )
                 best_val_acc = val_acc
 
