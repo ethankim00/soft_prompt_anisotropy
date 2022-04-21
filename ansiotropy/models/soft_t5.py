@@ -446,6 +446,20 @@ tot_train_time = 0
 pbar_update_freq = 10
 prompt_model.train()
 
+
+def exract_embeddings(prompt_model, inputs):
+    prompt_model.eval()
+    batch = prompt_model.template.process_batch(inputs)
+    batch = {
+        key: batch[key]
+        for key in batch
+        if key in prompt_model.prompt_model.forward_keys
+    }
+    outputs = prompt_model.plm(**batch, output_hidden_states=True)
+    embeddings = outputs.encoder_hidden_states[0]
+    return embeddings.cpu().numpy()
+
+
 pbar = tqdm(total=tot_step, desc="Train")
 for epoch in range(10):
     print(f"Begin epoch {epoch}")
@@ -453,11 +467,6 @@ for epoch in range(10):
         if use_cuda:
             inputs = inputs.cuda()
         tot_train_time -= time.time()
-        batch = prompt_model.template.process_batch(inputs)
-        batch = {key: batch[key] for key in batch if key in prompt_model.prompt_model.forward_keys}
-        outputs = prompt_model.plm(**batch,output_hidden_states=True)
-        print(outputs.encoder_hidden_states)
-        print(outputs.encoder_hidden_states[0].shape)
         logits = prompt_model(inputs)
         labels = inputs["label"]
         loss = loss_func(logits, labels)
