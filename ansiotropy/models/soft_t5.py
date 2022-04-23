@@ -304,7 +304,7 @@ train_dataloader = PromptDataLoader(
 )
 
 validation_dataloader = PromptDataLoader(
-    dataset=dataset["validation"],
+    dataset=dataset["validation"][0:30],
     template=mytemplate,
     tokenizer=tokenizer,
     tokenizer_wrapper_class=WrapperClass,
@@ -352,6 +352,8 @@ def evaluate(prompt_model, dataloader, desc):
         allpreds.extend(torch.argmax(logits, dim=-1).cpu().tolist())
     acc = sum([int(i == j) for i, j in zip(allpreds, alllabels)]) / len(allpreds)
     return acc
+
+
 
 
 from transformers import (
@@ -447,7 +449,7 @@ pbar_update_freq = 10
 prompt_model.train()
 
 
-def exract_embeddings(prompt_model, inputs):
+def extract_embeddings(prompt_model, inputs):
     prompt_model.eval()
     batch = prompt_model.template.process_batch(inputs)
     batch = {
@@ -455,18 +457,58 @@ def exract_embeddings(prompt_model, inputs):
         for key in batch
         if key in prompt_model.prompt_model.forward_keys
     }
+    prompt_model.train()
     outputs = prompt_model.plm(**batch, output_hidden_states=True)
     embeddings = outputs.encoder_hidden_states[0]
-    return embeddings.cpu().numpy()
+    return embeddings.detach().cpu().numpy()
 
 
+def save_embeddings(prompt_model, data_loader):
+    embeddings_dict = {"tokens": {}, "sentences": []}
+    prompt_model.eval()
+    for step, inputs in enumerate(data_loader):
+        inputs = inputs.cuda()
+        inputs_copy = InputFeatures(**inputs.to_dict()).cuda()
+        embeddings = extract_embeddings(
+            prompt_model, inputs_copy
+        ) 
+        for batch_idx in range(inputs["input_ids"].shape[0]):
+            for token_idx in range(prompt_model.template.num_tokens):
+                embeddings_dict["tokens"]["soft_token_{}".format(token_idx)] = (
+                    embeddings_dict["tokens"].get("soft_token_{}".format(token_idx), [])
+                    + embeddings[batch_idx][token_idx].tolist()
+                )
+            print(inputs["input_ids"])
+            padding_idx = 0
+            for input_id in inputs["input_ids"][batch_idx]:
+                padding_idx +=1
+                if input_id.cpu().numpy() == 0:
+                    break
+                print(input_id)
+                token = prompt_model.tokenizer.convert_ids_to_tokens([input_id])[0].replace("_", "")
+                embeddings_dict["tokens"][token] = embeddings[batch_idx][token_idx + prompt_model.template.num_tokens].tolist()
+            sentence = prompt_model.tokenizer.convert_ids_to_tokens(
+                inputs["input_ids"][batch_idx]
+            ) 
+            sentence = [token.replace("▁", "") for token in sentence if token != "<pad>"]
+            sentence = [
+                "soft_token_{}".format(i)
+                for i in range(prompt_model.template.num_tokens)
+            ] + sentence
+            sentence = " ".join(sentence)
+            embeddings_dict["sentences"].append({sentence: embeddings[batch_idx][:padding_idx]})
+    return embeddings_dict
+
+from openprompt.data_utils.utils import InputFeatures
 pbar = tqdm(total=tot_step, desc="Train")
 for epoch in range(10):
     print(f"Begin epoch {epoch}")
     for step, inputs in enumerate(train_dataloader):
         if use_cuda:
+            inputs_copy = InputFeatures(**inputs.to_dict()).cuda()
             inputs = inputs.cuda()
         tot_train_time -= time.time()
+        embeddings = save_embeddings(prompt_model, validation_dataloader)
         logits = prompt_model(inputs)
         labels = inputs["label"]
         loss = loss_func(logits, labels)
