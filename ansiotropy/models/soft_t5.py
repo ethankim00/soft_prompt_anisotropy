@@ -1,10 +1,12 @@
+from path import Path
 from tqdm import tqdm
 from openprompt.data_utils import PROCESSORS
 import torch
 from openprompt.data_utils.utils import InputExample
 import argparse
 import numpy as np
-
+import json
+from datetime import datetime
 from openprompt import PromptDataLoader
 from openprompt.prompts import ManualVerbalizer
 from openprompt.prompts import SoftTemplate
@@ -354,8 +356,6 @@ def evaluate(prompt_model, dataloader, desc):
     return acc
 
 
-
-
 from transformers import (
     AdamW,
     get_linear_schedule_with_warmup,
@@ -463,43 +463,58 @@ def extract_embeddings(prompt_model, inputs):
     return embeddings.detach().cpu().numpy()
 
 
-def save_embeddings(prompt_model, data_loader):
+def save_embeddings(prompt_model, data_loader, experiment_name=None):
     embeddings_dict = {"tokens": {}, "sentences": []}
     prompt_model.eval()
     for step, inputs in enumerate(data_loader):
         inputs = inputs.cuda()
         inputs_copy = InputFeatures(**inputs.to_dict()).cuda()
-        embeddings = extract_embeddings(
-            prompt_model, inputs_copy
-        ) 
+        embeddings = extract_embeddings(prompt_model, inputs_copy)
         for batch_idx in range(inputs["input_ids"].shape[0]):
             for token_idx in range(prompt_model.template.num_tokens):
                 embeddings_dict["tokens"]["soft_token_{}".format(token_idx)] = (
                     embeddings_dict["tokens"].get("soft_token_{}".format(token_idx), [])
                     + embeddings[batch_idx][token_idx].tolist()
                 )
-            print(inputs["input_ids"])
             padding_idx = 0
             for input_id in inputs["input_ids"][batch_idx]:
-                padding_idx +=1
+                padding_idx += 1
                 if input_id.cpu().numpy() == 0:
                     break
-                print(input_id)
-                token = prompt_model.tokenizer.convert_ids_to_tokens([input_id])[0].replace("_", "")
-                embeddings_dict["tokens"][token] = embeddings[batch_idx][token_idx + prompt_model.template.num_tokens].tolist()
+                token = prompt_model.tokenizer.convert_ids_to_tokens([input_id])[
+                    0
+                ].replace("_", "")
+                embeddings_dict["tokens"][token] = embeddings[batch_idx][
+                    token_idx + prompt_model.template.num_tokens
+                ].tolist()
             sentence = prompt_model.tokenizer.convert_ids_to_tokens(
                 inputs["input_ids"][batch_idx]
-            ) 
-            sentence = [token.replace("▁", "") for token in sentence if token != "<pad>"]
+            )
+            sentence = [
+                token.replace("▁", "") for token in sentence if token != "<pad>"
+            ]
             sentence = [
                 "soft_token_{}".format(i)
                 for i in range(prompt_model.template.num_tokens)
             ] + sentence
             sentence = " ".join(sentence)
-            embeddings_dict["sentences"].append({sentence: embeddings[batch_idx][:padding_idx]})
+            embeddings_dict["sentences"].append(
+                {sentence: embeddings[batch_idx][:padding_idx]}
+            )
+    if not experiment_name:
+        experiment_name = datetime.now().strftime("%Y%m%d-%H%M%S")
+    with open(
+        Path("./data/embeddings").joinpath(
+            "embeddings_{}.json".format(experiment_name)
+        ),
+        "w",
+    ) as f:
+        json.dump(embeddings_dict, f)
     return embeddings_dict
 
+
 from openprompt.data_utils.utils import InputFeatures
+
 pbar = tqdm(total=tot_step, desc="Train")
 for epoch in range(10):
     print(f"Begin epoch {epoch}")
