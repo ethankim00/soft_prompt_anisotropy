@@ -1,12 +1,14 @@
-from path import Path
 from tqdm import tqdm
 from openprompt.data_utils import PROCESSORS
 import torch
 from openprompt.data_utils.utils import InputExample
 import argparse
 import numpy as np
+from pathlib import Path
+from datetime import datetime 
 import json
-from datetime import datetime
+import pickle
+
 from openprompt import PromptDataLoader
 from openprompt.prompts import ManualVerbalizer
 from openprompt.prompts import SoftTemplate
@@ -356,6 +358,8 @@ def evaluate(prompt_model, dataloader, desc):
     return acc
 
 
+
+
 from transformers import (
     AdamW,
     get_linear_schedule_with_warmup,
@@ -505,16 +509,14 @@ def save_embeddings(prompt_model, data_loader, experiment_name=None):
         experiment_name = datetime.now().strftime("%Y%m%d-%H%M%S")
     with open(
         Path("./data/embeddings").joinpath(
-            "embeddings_{}.json".format(experiment_name)
+            "embeddings_{}.pkl".format(experiment_name)
         ),
-        "w",
+        "wb",
     ) as f:
-        json.dump(embeddings_dict, f)
+        pickle.dump(embeddings_dict, f)
     return embeddings_dict
 
-
 from openprompt.data_utils.utils import InputFeatures
-
 pbar = tqdm(total=tot_step, desc="Train")
 for epoch in range(10):
     print(f"Begin epoch {epoch}")
