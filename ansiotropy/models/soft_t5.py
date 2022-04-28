@@ -15,6 +15,8 @@ from openprompt.prompts import SoftTemplate
 from openprompt import PromptForClassification
 import time
 import os
+import wandb
+
 
 
 def parse():
@@ -51,7 +53,7 @@ def parse():
     parser.add_argument("--warmup_step_prompt", type=int, default=500)
     parser.add_argument("--init_from_vocab", action="store_false")
     parser.add_argument("--eval_every_steps", type=int, default=5)
-    parser.add_argument("--soft_token_num", type=int, default=20)
+    parser.add_argument("--soft_token_num", type=int, default=80)
     parser.add_argument("--optimizer", type=str, default="Adafactor")
     args = parser.parse_args()
 
@@ -73,6 +75,7 @@ def parse():
     content_write += "\n"
 
     print(content_write)
+    return args
 
 
 from openprompt.utils.reproduciblity import set_seed
@@ -368,6 +371,7 @@ from openprompt.data_utils.utils import InputFeatures
 
 
 if __name__ == "__main__":
+    wandb.init(project="soft_prompt_anisotropy", entity="ethankim10")
     args = parse()
     this_run_unicode = str(random.randint(0, 1e10))
     set_seed(args.seed)
@@ -460,7 +464,7 @@ if __name__ == "__main__":
         "truncate rate: {}".format(test_dataloader.tokenizer_wrapper.truncate_rate),
         flush=True,
     )
-    oss_func = torch.nn.CrossEntropyLoss()
+    loss_func = torch.nn.CrossEntropyLoss()
 
     tot_step = args.max_steps
 
@@ -552,6 +556,7 @@ if __name__ == "__main__":
             labels = inputs["label"]
             loss = loss_func(logits, labels)
             loss.backward()
+            wandb.log({"loss": loss})
             tot_loss += loss.item()
             actual_step += 1
 
@@ -584,6 +589,7 @@ if __name__ == "__main__":
             ):
                 val_acc = evaluate(prompt_model, validation_dataloader, desc="Valid")
                 print(val_acc)
+                wandb.log({"val_acc": val_acc})
                 if val_acc >= best_val_acc:
                     torch.save(
                         prompt_model.state_dict(),
