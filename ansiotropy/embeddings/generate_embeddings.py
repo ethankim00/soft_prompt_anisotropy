@@ -5,6 +5,7 @@ from re import template
 from typing import Dict
 import pickle
 from attr import dataclass
+from boto import config
 import torch
 from openprompt.data_utils.utils import InputFeatures
 from openprompt import PromptDataLoader
@@ -37,15 +38,19 @@ class SoftPromptEmbeddingsExtractor:
     def __load_from_file(self, file_path: str):
         # Load the model configuration
         # load the parameter state dict from file and initialize the model
+        model_data = torch.load(file_path)
+        self.config = model_data["config"]
+        state_dict = model_data["state_dict"]
         self.plm, self.tokenizer, model_config, WrapperClass = load_plm(
             self.params.model, self.params.model_name_or_path
         )
-        self.template = self._load_template(plm, tokenizer)
-        self.dataloader = self._load_data(
-            self.template, tokenizer=tokenizer, wrapperclass=WrapperClass
+        self.template = self._load_template(self.plm, self.tokenizer)
+        self.dataloader, self.class_labels = self._load_data(
+            self.template, tokenizer=self.tokenizer, wrapperclass=WrapperClass
         )
+        self._load_verbalizer()
 
-        self._load_model()
+        self._load_model(state_dict=state_dict)
 
     def _load_template(self, plm, tokenizer):
         scriptsbase = SUPERGLUE_SCRIPTS_BASE[self.dataset]
@@ -60,13 +65,13 @@ class SoftPromptEmbeddingsExtractor:
     def _load_verbalizer(self):
         scriptsbase = SUPERGLUE_SCRIPTS_BASE[self.dataset]
         self.verbalizer = ManualVerbalizer(
-            self.tokenizer, classes=class_labels
+            self.tokenizer, classes=self.class_labels
         ).from_file(
             f"scripts/{scriptsbase}/manual_verbalizer.txt",
             choice=0,
         )
 
-    def _load_model(self):
+    def _load_model(self, state_dict):
         self.prompt_model = PromptForClassification(
             plm=self.plm,
             template=self.template,
@@ -74,9 +79,10 @@ class SoftPromptEmbeddingsExtractor:
             freeze_plm=True,
             plm_eval_mode=True,
         )
+        self.prompt_model.load_state_dict(state_dict)
 
     def _load_data(self, template, tokenizer, wrapperclass):
-        dataset = load_validation_data(self.dataset)
+        dataset, labels = load_validation_data(self.dataset)
         validation_dataloader = PromptDataLoader(
             dataset=dataset,
             template=template,
@@ -91,7 +97,7 @@ class SoftPromptEmbeddingsExtractor:
             truncate_method="tail",
         )
 
-        return validation_dataloader
+        return validation_dataloader, labels
 
     def extract_soft_prompt_embeddings(prompt_model, inputs):
         prompt_model.eval()

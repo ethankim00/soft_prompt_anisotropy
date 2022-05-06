@@ -13,10 +13,10 @@ from openprompt import PromptDataLoader
 from openprompt.prompts import ManualVerbalizer
 from openprompt.prompts import SoftTemplate
 from openprompt import PromptForClassification
+from ansiotropy.embeddings.generate_embeddings import SoftPromptConfig
 import time
 import os
 import wandb
-
 
 
 def parse():
@@ -310,6 +310,13 @@ from openprompt.data_utils.utils import InputFeatures
 if __name__ == "__main__":
     wandb.init(project="soft_prompt_anisotropy", entity="ethankim10")
     args = parse()
+
+    model_config = SoftPromptConfig(
+        model=args.model,
+        model_name_or_path=args.model_name_or_path,
+        num_prompt_tokens=args.num_prompt_tokens,
+        initialize_from_vocab=args.init_from_vocab,
+    )
     this_run_unicode = str(random.randint(0, 1e10))
     set_seed(args.seed)
 
@@ -528,7 +535,10 @@ if __name__ == "__main__":
                 wandb.log({"val_acc": val_acc})
                 if val_acc >= best_val_acc:
                     torch.save(
-                        prompt_model.state_dict(),
+                        {
+                            "config": model_config,
+                            "model": prompt_model.state_dict(),
+                        },
                         f".{args.project_root}{this_run_unicode}.ckpt",
                     )
                     best_val_acc = val_acc
