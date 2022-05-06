@@ -304,69 +304,6 @@ from transformers.optimization import (
     AdafactorSchedule,
 )  # use Adafactor is the default setting for T5
 
-
-def extract_embeddings(prompt_model, inputs):
-    prompt_model.eval()
-    batch = prompt_model.template.process_batch(inputs)
-    batch = {
-        key: batch[key]
-        for key in batch
-        if key in prompt_model.prompt_model.forward_keys
-    }
-    prompt_model.train()
-    outputs = prompt_model.plm(**batch, output_hidden_states=True)
-    embeddings = outputs.encoder_hidden_states[0]
-    return embeddings.detach().cpu().numpy()
-
-
-def save_embeddings(prompt_model, data_loader, experiment_name=None):
-    embeddings_dict = {"tokens": {}, "sentences": []}
-    prompt_model.eval()
-    for step, inputs in enumerate(data_loader):
-        inputs = inputs.cuda()
-        inputs_copy = InputFeatures(**inputs.to_dict()).cuda()
-        embeddings = extract_embeddings(prompt_model, inputs_copy)
-        for batch_idx in range(inputs["input_ids"].shape[0]):
-            for token_idx in range(prompt_model.template.num_tokens):
-                embeddings_dict["tokens"]["soft_token_{}".format(token_idx)] = (
-                    embeddings_dict["tokens"].get("soft_token_{}".format(token_idx), [])
-                    + embeddings[batch_idx][token_idx].tolist()
-                )
-            padding_idx = 0
-            for input_id in inputs["input_ids"][batch_idx]:
-                padding_idx += 1
-                if input_id.cpu().numpy() == 0:
-                    break
-                token = prompt_model.tokenizer.convert_ids_to_tokens([input_id])[
-                    0
-                ].replace("_", "")
-                embeddings_dict["tokens"][token] = embeddings[batch_idx][
-                    token_idx + prompt_model.template.num_tokens
-                ].tolist()
-            sentence = prompt_model.tokenizer.convert_ids_to_tokens(
-                inputs["input_ids"][batch_idx]
-            )
-            sentence = [
-                token.replace("▁", "") for token in sentence if token != "<pad>"
-            ]
-            sentence = [
-                "soft_token_{}".format(i)
-                for i in range(prompt_model.template.num_tokens)
-            ] + sentence
-            sentence = " ".join(sentence)
-            embeddings_dict["sentences"].append(
-                {sentence: embeddings[batch_idx][:padding_idx]}
-            )
-    if not experiment_name:
-        experiment_name = datetime.now().strftime("%Y%m%d-%H%M%S")
-    with open(
-        Path("./data/embeddings").joinpath("embeddings_{}.pkl".format(experiment_name)),
-        "wb",
-    ) as f:
-        pickle.dump(embeddings_dict, f)
-    return embeddings_dict
-
-
 from openprompt.data_utils.utils import InputFeatures
 
 
@@ -551,7 +488,6 @@ if __name__ == "__main__":
                 inputs_copy = InputFeatures(**inputs.to_dict()).cuda()
                 inputs = inputs.cuda()
             tot_train_time -= time.time()
-            embeddings = save_embeddings(prompt_model, validation_dataloader)
             logits = prompt_model(inputs)
             labels = inputs["label"]
             loss = loss_func(logits, labels)
