@@ -35,7 +35,7 @@ def parse():
         default="t5-lm",
         help="We test both t5 and t5-lm in this scripts, the corresponding tokenizerwrapper will be automatically loaded.",
     )
-    parser.add_argument("--model_name_or_path", default="t5-base")
+    parser.add_argument("--model_name_or_path", default="t5-small")
     parser.add_argument(
         "--project_root",
         default="/",
@@ -47,13 +47,13 @@ def parse():
         "--data_dir", type=str, default="./data/"
     )  # sometimes, huggingface datasets can not be automatically downloaded due to network issue, please refer to 0_basic.py line 15 for solutions.
     parser.add_argument("--dataset", default="boolq", type=str)
-    parser.add_argument("--result_file", type=str, default="../results.txt")
+    parser.add_argument("--result_file", type=str, default="./results.txt")
     parser.add_argument("--max_steps", default=20000, type=int)
     parser.add_argument("--prompt_lr", type=float, default=0.3)
     parser.add_argument("--warmup_step_prompt", type=int, default=500)
     parser.add_argument("--init_from_vocab", action="store_false")
     parser.add_argument("--eval_every_steps", type=int, default=5)
-    parser.add_argument("--soft_token_num", type=int, default=80)
+    parser.add_argument("--soft_token_num", type=int, default=0)
     parser.add_argument("--optimizer", type=str, default="Adafactor")
     args = parser.parse_args()
 
@@ -311,10 +311,10 @@ if __name__ == "__main__":
     wandb.init(project="soft_prompt_anisotropy", entity="ethankim10")
     args = parse()
 
-    model_config = SoftPromptConfig(
+    exp_config = SoftPromptConfig(
         model=args.model,
         model_name_or_path=args.model_name_or_path,
-        num_prompt_tokens=args.num_prompt_tokens,
+        num_prompt_tokens=args.soft_token_num,
         initialize_from_vocab=args.init_from_vocab,
     )
     this_run_unicode = str(random.randint(0, 1e10))
@@ -536,7 +536,7 @@ if __name__ == "__main__":
                 if val_acc >= best_val_acc:
                     torch.save(
                         {
-                            "config": model_config,
+                            "exp": exp_config.__dict__,
                             "model": prompt_model.state_dict(),
                         },
                         f".{args.project_root}{this_run_unicode}.ckpt",
@@ -578,15 +578,15 @@ if __name__ == "__main__":
                 step99 = min(val_time * args.eval_every_steps, step99)
                 if acc >= thres100:
                     step100 = min(val_time * args.eval_every_steps, step100)
-
+    content_write = ""
     content_write += f"BestValAcc:{best_val_acc}\tEndValAcc:{acc_traces[-1]}\tcritical_steps:{[step98,step99,step100]}\n"
     content_write += "\n"
 
     print(content_write)
 
-    with open(f"{args.result_file}", "a") as fout:
-        fout.write(content_write)
+    #with open(f"{args.result_file}", "a") as fout:
+    #    fout.write(content_write)
 
     import os
 
-    os.remove(f"../ckpts/{this_run_unicode}.ckpt")
+    #os.remove(f"../ckpts/{this_run_unicode}.ckpt")

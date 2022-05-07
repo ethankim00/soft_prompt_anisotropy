@@ -1,7 +1,7 @@
 from cProfile import label
 from openprompt.data_utils import PROCESSORS
 
-DATA_DIR = "/"
+DATA_DIR = "./data/"
 
 SUPERGLUE_TASKS = [
     "cb",
@@ -34,12 +34,13 @@ SUPERGLUE_SCRIPTS_BASE = {
     "qqp": "SuperGLUE/QQP",
     "qnli": "SuperGLUE/QNLI",
     "mnli_mm": "SuperGLUE/MNLI-MM",
+    "cb": "SuperGLUE/CB", 
 }
 
 
 def load_validation_data(dataset: str):
     if dataset in SUPERGLUE_TASKS:
-        dataset = "superglue.{}".format(dataset)
+        dataset = "super_glue.{}".format(dataset)
     Processor = PROCESSORS[dataset]
     validation_dataset = Processor().get_dev_examples(DATA_DIR)
     class_labels = Processor().get_labels()

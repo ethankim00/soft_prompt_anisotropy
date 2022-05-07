@@ -59,6 +59,11 @@ def word_cosine_similarity(embeddings_dict: Dict, center: bool = False) -> float
         similarities.append(cos)
         similarities_dict[token] = cos
     avg_cos = np.mean(similarities)
+    avg_cos_soft = np.mean(similarities[:embeddings_dict["soft_prompt_tokens"]])
+    avg_cos_regular = np.mean(similarities[embeddings_dict["soft_prompt_tokens"]])
+    print("Avg cosine similarity", avg_cos)
+    print("Soft cosine similarity", avg_cos_soft)
+    print("Regular cosine similarity", avg_cos_regular)
     return avg_cos, similarities_dict
 
 
@@ -97,7 +102,6 @@ def get_average_mev(embeddings_dict: Dict, center: bool = False):
     mev_list = []
     for token, embedding in embedding_dict["tokens"].items():
         embedding = np.vstack(embedding)
-        print(embedding.shape)
         mev = maximum_explainable_variance(embedding)
         mev_dict[token] = mev
         mev_list.append(mev)
@@ -126,12 +130,20 @@ def intra_sentence_cosine_similarity(embeddings: Dict, center: bool = False) -> 
             for sentence in embeddings["sentences"]
         ]
     similarities = []
+    soft_similarities = []
+    regular_similarities = []
     for sentence in embeddings["sentences"]:
         embedding = list(sentence.values())[0]
         sentence_emdedding = np.mean(embedding, axis=0).reshape(1, -1)
         sentence_cos = cosine_similarity(sentence_emdedding, embedding)
         avg_cos = np.mean(sentence_cos)
+        avg_cos_soft = np.mean(sentence_cos[:embeddings["soft_prompt_tokens"]])
+        avg_cos_regular = np.mean(sentence_cos[embeddings["soft_prompt_tokens"]:])
         similarities.append(avg_cos)
+        soft_similarities.append(avg_cos_soft)
+        regular_similarities.append(avg_cos_regular)
+    print("soft", np.mean(soft_similarities))
+    print("regular", np.mean(regular_similarities))
     return np.mean(similarities)
 
 

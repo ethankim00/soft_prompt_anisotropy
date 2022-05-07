@@ -4,8 +4,6 @@ from datetime import datetime
 from re import template
 from typing import Dict
 import pickle
-from attr import dataclass
-from boto import config
 import torch
 from openprompt.data_utils.utils import InputFeatures
 from openprompt import PromptDataLoader
@@ -34,13 +32,15 @@ class SoftPromptEmbeddingsExtractor:
 
         self.model_path = model_path
         self.dataset = dataset
+        self.__load_from_file(model_path)
 
     def __load_from_file(self, file_path: str):
         # Load the model configuration
         # load the parameter state dict from file and initialize the model
         model_data = torch.load(file_path)
-        self.config = model_data["config"]
-        state_dict = model_data["state_dict"]
+        self.params = SoftPromptConfig(**model_data["exp"])
+        print(self.params)
+        state_dict = model_data["model"]
         self.plm, self.tokenizer, model_config, WrapperClass = load_plm(
             self.params.model, self.params.model_name_or_path
         )
@@ -80,6 +80,7 @@ class SoftPromptEmbeddingsExtractor:
             plm_eval_mode=True,
         )
         self.prompt_model.load_state_dict(state_dict)
+        self.prompt_model.cuda()
 
     def _load_data(self, template, tokenizer, wrapperclass):
         dataset, labels = load_validation_data(self.dataset)
@@ -99,7 +100,7 @@ class SoftPromptEmbeddingsExtractor:
 
         return validation_dataloader, labels
 
-    def extract_soft_prompt_embeddings(prompt_model, inputs):
+    def extract_soft_prompt_embeddings(self, prompt_model, inputs):
         prompt_model.eval()
         batch = prompt_model.template.process_batch(inputs)
         batch = {
@@ -112,9 +113,9 @@ class SoftPromptEmbeddingsExtractor:
         embeddings = outputs.encoder_hidden_states[0]
         return embeddings.detach().cpu().numpy()
 
-    def save_soft_prompt_embeddings(self, save_dict: bool = True) -> Dict:
+    def save_soft_prompt_embeddings(self, save_dict: bool = True, experiment_name = None) -> Dict:
         embeddings_dict = {"tokens": {}, "sentences": []}
-        self.prompt.prompt_model.eval()
+        self.prompt_model.eval()
         for step, inputs in enumerate(self.dataloader):
             inputs = inputs.cuda()
             inputs_copy = InputFeatures(**inputs.to_dict()).cuda()
@@ -166,3 +167,12 @@ class SoftPromptEmbeddingsExtractor:
                 pickle.dump(embeddings_dict, f)
         embeddings_dict["soft_prompt_tokens"] = self.prompt_model.template.num_tokens
         return embeddings_dict
+
+    
+    
+if __name__ == "__main__":
+    
+    extractor = SoftPromptEmbeddingsExtractor(model_path = "4718005879.ckpt", dataset = "cb")
+    test = extractor.save_soft_prompt_embeddings()
+    print(test)
+    
