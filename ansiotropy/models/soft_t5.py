@@ -35,7 +35,7 @@ def parse():
         default="t5-lm",
         help="We test both t5 and t5-lm in this scripts, the corresponding tokenizerwrapper will be automatically loaded.",
     )
-    parser.add_argument("--model_name_or_path", default="t5-small")
+    parser.add_argument("--model_name_or_path", default="t5-base")
     parser.add_argument(
         "--project_root",
         default="/",
@@ -48,12 +48,12 @@ def parse():
     )  # sometimes, huggingface datasets can not be automatically downloaded due to network issue, please refer to 0_basic.py line 15 for solutions.
     parser.add_argument("--dataset", default="boolq", type=str)
     parser.add_argument("--result_file", type=str, default="./results.txt")
-    parser.add_argument("--max_steps", default=20000, type=int)
+    parser.add_argument("--max_steps", default=1000, type=int)
     parser.add_argument("--prompt_lr", type=float, default=0.3)
     parser.add_argument("--warmup_step_prompt", type=int, default=500)
     parser.add_argument("--init_from_vocab", action="store_false")
     parser.add_argument("--eval_every_steps", type=int, default=5)
-    parser.add_argument("--soft_token_num", type=int, default=0)
+    parser.add_argument("--soft_token_num", type=int, default=20)
     parser.add_argument("--optimizer", type=str, default="Adafactor")
     args = parser.parse_args()
 
@@ -310,6 +310,7 @@ from openprompt.data_utils.utils import InputFeatures
 if __name__ == "__main__":
     wandb.init(project="soft_prompt_anisotropy", entity="ethankim10")
     args = parse()
+    wandb.config.update(args)
 
     exp_config = SoftPromptConfig(
         model=args.model,
@@ -318,6 +319,7 @@ if __name__ == "__main__":
         initialize_from_vocab=args.init_from_vocab,
     )
     this_run_unicode = str(random.randint(0, 1e10))
+    wandb.config.update({"id":this_run_unicode})
     set_seed(args.seed)
 
     plm, tokenizer, model_config, WrapperClass = load_plm(
@@ -542,6 +544,7 @@ if __name__ == "__main__":
                         f".{args.project_root}{this_run_unicode}.ckpt",
                     )
                     best_val_acc = val_acc
+                    wandb.log({"best_val_acc": best_val_acc})
 
                 acc_traces.append(val_acc)
                 print(

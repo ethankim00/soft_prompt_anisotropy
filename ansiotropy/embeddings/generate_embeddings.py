@@ -28,8 +28,9 @@ class SoftPromptConfig:
 
 
 class SoftPromptEmbeddingsExtractor:
-    def __init__(self, model_path: str, dataset: str):
+    def __init__(self, model_path: str, dataset: str, use_cuda: bool = True):
 
+        self.use_cuda = use_cuda
         self.model_path = model_path
         self.dataset = dataset
         self.__load_from_file(model_path)
@@ -80,7 +81,8 @@ class SoftPromptEmbeddingsExtractor:
             plm_eval_mode=True,
         )
         self.prompt_model.load_state_dict(state_dict)
-        self.prompt_model.cuda()
+        if self.use_cuda:
+            self.prompt_model.cuda()
 
     def _load_data(self, template, tokenizer, wrapperclass):
         dataset, labels = load_validation_data(self.dataset)
@@ -131,7 +133,7 @@ class SoftPromptEmbeddingsExtractor:
                         + embeddings[batch_idx][token_idx].tolist()
                     )
                 padding_idx = 0
-                for input_id in inputs["input_ids"][batch_idx]:
+                for idx, input_id in enumerate(inputs["input_ids"][batch_idx]):
                     padding_idx += 1
                     if input_id.cpu().numpy() == 0:
                         break
@@ -139,7 +141,7 @@ class SoftPromptEmbeddingsExtractor:
                         [input_id]
                     )[0].replace("_", "")
                     embeddings_dict["tokens"][token] = embeddings[batch_idx][
-                        token_idx + self.prompt_model.template.num_tokens
+                        idx + self.prompt_model.template.num_tokens
                     ].tolist()
                 sentence = self.prompt_model.tokenizer.convert_ids_to_tokens(
                     inputs["input_ids"][batch_idx]

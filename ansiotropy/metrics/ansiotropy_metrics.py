@@ -137,8 +137,11 @@ def intra_sentence_cosine_similarity(embeddings: Dict, center: bool = False) -> 
         sentence_emdedding = np.mean(embedding, axis=0).reshape(1, -1)
         sentence_cos = cosine_similarity(sentence_emdedding, embedding)
         avg_cos = np.mean(sentence_cos)
-        avg_cos_soft = np.mean(sentence_cos[:embeddings["soft_prompt_tokens"]])
-        avg_cos_regular = np.mean(sentence_cos[embeddings["soft_prompt_tokens"]:])
+        if embeddings["soft_prompt_tokens"] > 0:
+            avg_cos_soft = np.mean(sentence_cos[:, :embeddings["soft_prompt_tokens"]])
+        else:
+            avg_cos_soft = 0
+        avg_cos_regular = np.mean(sentence_cos[:, embeddings["soft_prompt_tokens"]:])
         similarities.append(avg_cos)
         soft_similarities.append(avg_cos_soft)
         regular_similarities.append(avg_cos_regular)
