@@ -59,7 +59,7 @@ def word_cosine_similarity(embeddings_dict: Dict, center: bool = False) -> float
         similarities.append(cos)
         similarities_dict[token] = cos
     avg_cos = np.mean(similarities)
-    avg_cos_soft = np.mean(similarities[:embeddings_dict["soft_prompt_tokens"]])
+    avg_cos_soft = np.mean(similarities[: embeddings_dict["soft_prompt_tokens"]])
     avg_cos_regular = np.mean(similarities[embeddings_dict["soft_prompt_tokens"]])
     print("Avg cosine similarity", avg_cos)
     print("Soft cosine similarity", avg_cos_soft)
@@ -96,6 +96,8 @@ def maximum_explainable_variance(
 
 
 def get_average_mev(embeddings_dict: Dict, center: bool = False):
+    """Calculate the average maximum explainable variance for all embeddings."""
+    # TODO calculate average mev for soft prompt and regular tokens separately
     if center:
         embedding_dict = center_token_embeddings(embeddings_dict)
     mev_dict = {}
@@ -138,16 +140,16 @@ def intra_sentence_cosine_similarity(embeddings: Dict, center: bool = False) -> 
         sentence_cos = cosine_similarity(sentence_emdedding, embedding)
         avg_cos = np.mean(sentence_cos)
         if embeddings["soft_prompt_tokens"] > 0:
-            avg_cos_soft = np.mean(sentence_cos[:, :embeddings["soft_prompt_tokens"]])
+            avg_cos_soft = np.mean(sentence_cos[:, : embeddings["soft_prompt_tokens"]])
         else:
             avg_cos_soft = 0
-        avg_cos_regular = np.mean(sentence_cos[:, embeddings["soft_prompt_tokens"]:])
+        avg_cos_regular = np.mean(sentence_cos[:, embeddings["soft_prompt_tokens"] :])
         similarities.append(avg_cos)
         soft_similarities.append(avg_cos_soft)
         regular_similarities.append(avg_cos_regular)
-    print("soft", np.mean(soft_similarities))
-    print("regular", np.mean(regular_similarities))
-    return np.mean(similarities)
+    avg_soft_similarity = np.mean(soft_similarities)
+    avg_regular_similarity = np.mean(regular_similarities)
+    return avg_soft_similarity, avg_regular_similarity
 
 
 if __name__ == "__main__":

@@ -1,6 +1,4 @@
-from sympy import re
 from ansiotropy.embeddings.generate_embeddings import SoftPromptEmbeddingsExtractor
-
 from ansiotropy.metrics import (
     get_average_mev,
     intra_sentence_cosine_similarity,
@@ -72,18 +70,14 @@ def compute_all_metrics(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: Dataframe with metrics
     """
-    metrics_list = []
-    for index, row in df.iterrows():
-        dictionary = calculate_ansiotropy_metrics(
-            row["model_id"],
-            row["model_type"],
-            row["dataset_name"],
-            row["soft_token_num"],
+    metrics_df = []
+    for i, row in df.iterrows():
+        metrics = calculate_ansiotropy_metrics(
+            row["id"], row["model"], row["dataset"], row["soft_token_num"]
         )
-        dictionary.update({"model_id": row["model_id"]})
-        metrics_list.append(dictionary)
-    metrics_df = pd.DataFrame(metrics_list)
-    return metrics_df
+        metrics_df.append(metrics)
+
+    return pd.DataFrame(metrics_df)
 
 
 def load_wandb_run(project_name) -> pd.DataFrame:
@@ -104,6 +98,7 @@ def load_wandb_run(project_name) -> pd.DataFrame:
 
 if __name__ == "__main__":
     df = load_wandb_run("ethankim10/soft_prompt_anisotropy")
+    print(df.head())
     metrics_df = compute_all_metrics(df)
     # merge metrics_df with df
     df = pd.merge(df, metrics_df, on="model_id")
