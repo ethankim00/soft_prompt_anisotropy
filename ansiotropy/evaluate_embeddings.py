@@ -73,7 +73,7 @@ def compute_all_metrics(df: pd.DataFrame) -> pd.DataFrame:
     metrics_df = []
     for i, row in df.iterrows():
         metrics = calculate_ansiotropy_metrics(
-            row["id"], row["model"], row["dataset"], row["soft_token_num"]
+            row["id"] + ".ckpt", row["model_name_or_path"], row["dataset"], row["soft_token_num"]
         )
         metrics_df.append(metrics)
 
@@ -92,13 +92,19 @@ def load_wandb_run(project_name) -> pd.DataFrame:
     api = wandb.Api()
     runs = api.runs(project_name)
     config_list = [{k: v for k, v in run.config.items()} for run in runs]
+    summary_list = [{k: v for k, v in run.summary._json_dict.items() if not k.startswith('_')} for run in runs ]
+    print(summary_list)
+    summary_df = pd.DataFrame(summary_list)
     df = pd.DataFrame(config_list)
+    df = df.join(summary_df)
     return df
 
 
 if __name__ == "__main__":
     df = load_wandb_run("ethankim10/soft_prompt_anisotropy")
+    print(df.columns)
     print(df.head())
+    df = df.loc[df["best_val_acc"].notna()]
     metrics_df = compute_all_metrics(df)
     # merge metrics_df with df
     df = pd.merge(df, metrics_df, on="model_id")
