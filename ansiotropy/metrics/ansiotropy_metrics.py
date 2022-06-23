@@ -55,7 +55,7 @@ def word_cosine_similarity(embeddings_dict: Dict, center: bool = False) -> float
     similarities_dict = {}
     for token, embedding in embeddings_dict["tokens"].items():
         embedding = np.vstack(embedding)
-        cos = inter_context_cosine_similarity(embedding)
+        cos = inter_context_cosine_similarity(embedding, sample_size = 3000)
         similarities.append(cos)
         similarities_dict[token] = cos
     avg_cos = np.mean(similarities)
@@ -72,8 +72,11 @@ def inter_context_cosine_similarity(
 ) -> float:
     if center:
         X = StandardScaler(with_std=False).fit(X).transform(X)
-    # if sample_size >= 0:
-    #    X = X.sample(sample_size)
+    print(X.shape)
+    if sample_size >= 0:
+        idx = np.random.randint(X.shape[0], size=sample_size)
+        X = X[idx, :]
+    print(X.shape)
     cos = cosine_similarity(X, X)  # pairwise cosine similarities
     avg_cos = (
         (np.sum(np.sum(cos)) - cos.shape[0])
