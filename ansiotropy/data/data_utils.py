@@ -4,19 +4,14 @@ from openprompt.data_utils import PROCESSORS
 DATA_DIR = "./data/"
 
 SUPERGLUE_TASKS = [
+    "multirc",
+    "boolq",
     "cb",
     "copa",
-    "multirc",
-    "stsb",
-    "wsc",
     "rte",
-    "mnli",
-    "mrpc",
-    "sst2",
     "wic",
-    "qqp",
-    "qnli",
-    "mnli_mm",
+    "wsc",
+    "record",
 ]
 
 
