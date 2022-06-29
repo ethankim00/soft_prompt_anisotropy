@@ -18,6 +18,8 @@ import time
 import os
 import wandb
 
+torch.cuda.set_device(1)
+
 
 def parse():
     parser = argparse.ArgumentParser("")
@@ -52,7 +54,7 @@ def parse():
     parser.add_argument("--prompt_lr", type=float, default=0.3)
     parser.add_argument("--warmup_step_prompt", type=int, default=500)
     parser.add_argument("--init_from_vocab", action="store_false")
-    parser.add_argument("--eval_every_steps", type=int, default=5)
+    parser.add_argument("--eval_every_steps", type=int, default=500)
     parser.add_argument("--soft_token_num", type=int, default=20)
     parser.add_argument("--optimizer", type=str, default="Adafactor")
     args = parser.parse_args()
@@ -257,6 +259,66 @@ def get_dataset(args):
             batchsize_e = 4
             gradient_accumulation_steps = 4
             model_parallelize = False
+    elif args.dataset == "cb":
+        Processor = PROCESSORS["super_glue.cb"]
+        dataset["train"] = Processor().get_train_examples(args.data_dir)
+        dataset["validation"] = Processor().get_dev_examples(args.data_dir)
+        dataset["test"] = Processor().get_test_examples(args.data_dir)
+        class_labels = Processor().get_labels()
+        scriptsbase = "SuperGLUE/CB"
+        scriptformat = "txt"
+        max_seq_l = 480
+        if args.tune_plm:
+            batchsize_t = 4
+            batchsize_e = 4
+            gradient_accumulation_steps = 8
+            model_parallelize = True
+        else:
+            batchsize_t = 8
+            batchsize_e = 4
+            gradient_accumulation_steps = 4
+            model_parallelize = False
+    elif args.dataset == "copa":
+        Processor = PROCESSORS["super_glue.copa"]
+        dataset["train"] = Processor().get_train_examples(args.data_dir)
+        dataset["validation"] = Processor().get_dev_examples(args.data_dir)
+        dataset["test"] = Processor().get_test_examples(args.data_dir)
+        class_labels = Processor().get_labels()
+        scriptsbase = "SuperGLUE/COPA"
+        scriptformat = "txt"
+        max_seq_l = 480
+        if args.tune_plm:
+            batchsize_t = 4
+            batchsize_e = 4
+            gradient_accumulation_steps = 8
+            model_parallelize = True
+        else:
+            batchsize_t = 8
+            batchsize_e = 4
+            gradient_accumulation_steps = 4
+            model_parallelize = False
+    elif args.dataset == "wsc":
+        Processor = PROCESSORS["super_glue.wsc"]
+        dataset["train"] = Processor().get_train_examples(args.data_dir)
+        dataset["validation"] = Processor().get_dev_examples(args.data_dir)
+        dataset["test"] = Processor().get_test_examples(args.data_dir)
+        class_labels = Processor().get_labels()
+        scriptsbase = "SuperGLUE/WSC"
+        scriptformat = "txt"
+        max_seq_l = 480
+        if args.tune_plm:
+            batchsize_t = 4
+            batchsize_e = 4
+            gradient_accumulation_steps = 8
+            model_parallelize = True
+        else:
+            batchsize_t = 8
+            batchsize_e = 4
+            gradient_accumulation_steps = 4
+            model_parallelize = False
+    
+        
+        
     else:
         raise NotImplementedError
     return (
@@ -285,7 +347,7 @@ def evaluate(prompt_model, dataloader, desc):
 
     for step, inputs in enumerate(dataloader):
         if use_cuda:
-            inputs = inputs.cuda()
+            inputs = inputs.to("cuda:1")
         logits = prompt_model(inputs)
         labels = inputs["label"]
         alllabels.extend(labels.cpu().tolist())
@@ -358,7 +420,8 @@ if __name__ == "__main__":
         plm_eval_mode=args.plm_eval_mode,
     )
     if use_cuda:
-        prompt_model = prompt_model.cuda()
+        prompt_model = prompt_model.to("cuda:1")
+        print(prompt_model.device)
 
     if model_parallelize:
         prompt_model.parallelize()
@@ -494,8 +557,8 @@ if __name__ == "__main__":
         print(f"Begin epoch {epoch}")
         for step, inputs in enumerate(train_dataloader):
             if use_cuda:
-                inputs_copy = InputFeatures(**inputs.to_dict()).cuda()
-                inputs = inputs.cuda()
+                #inputs_copy = InputFeatures(**inputs.to_dict()).cuda()
+                inputs = inputs.to("cuda:1")
             tot_train_time -= time.time()
             logits = prompt_model(inputs)
             labels = inputs["label"]
@@ -569,23 +632,23 @@ if __name__ == "__main__":
     # test_acc = evaluate(prompt_model, test_dataloader, desc="Test")
     # test_acc = evaluate(prompt_model, test_dataloader, desc="Test")
 
-    # a simple measure for the convergence speed.
-    thres99 = 0.99 * best_val_acc
-    thres98 = 0.98 * best_val_acc
-    thres100 = best_val_acc
-    step100 = step98 = step99 = args.max_steps
-    for val_time, acc in enumerate(acc_traces):
-        if acc >= thres98:
-            step98 = min(val_time * args.eval_every_steps, step98)
-            if acc >= thres99:
-                step99 = min(val_time * args.eval_every_steps, step99)
-                if acc >= thres100:
-                    step100 = min(val_time * args.eval_every_steps, step100)
-    content_write = ""
-    content_write += f"BestValAcc:{best_val_acc}\tEndValAcc:{acc_traces[-1]}\tcritical_steps:{[step98,step99,step100]}\n"
-    content_write += "\n"
+#     # a simple measure for the convergence speed.
+#     thres99 = 0.99 * best_val_acc
+#     thres98 = 0.98 * best_val_acc
+#     thres100 = best_val_acc
+#     step100 = step98 = step99 = args.max_steps
+#     for val_time, acc in enumerate(acc_traces):
+#         if acc >= thres98:
+#             step98 = min(val_time * args.eval_every_steps, step98)
+#             if acc >= thres99:
+#                 step99 = min(val_time * args.eval_every_steps, step99)
+#                 if acc >= thres100:
+#                     step100 = min(val_time * args.eval_every_steps, step100)
+#     content_write = ""
+#     content_write += f"BestValAcc:{best_val_acc}\tEndValAcc:{acc_traces[-1]}\tcritical_steps:{[step98,step99,step100]}\n"
+#     content_write += "\n"
 
-    print(content_write)
+#     print(content_write)
 
     #with open(f"{args.result_file}", "a") as fout:
     #    fout.write(content_write)
