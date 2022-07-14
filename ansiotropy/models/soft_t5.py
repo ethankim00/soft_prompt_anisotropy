@@ -8,6 +8,7 @@ from pathlib import Path
 from datetime import datetime
 import json
 import pickle
+from datasets import load_dataset
 
 from openprompt import PromptDataLoader
 from openprompt.prompts import ManualVerbalizer
@@ -18,7 +19,7 @@ import time
 import os
 import wandb
 
-torch.cuda.set_device(1)
+torch.cuda.set_device(0)
 
 
 def parse():
@@ -316,6 +317,26 @@ def get_dataset(args):
             batchsize_e = 4
             gradient_accumulation_steps = 4
             model_parallelize = False
+    elif args.dataset == "sst-2":
+        a = load_dataset("sst2", cache_dir = args.data_dir, split = "train")
+        Processor = PROCESSORS["sst-2"]
+        dataset["train"] = Processor().get_train_examples(args.data_dir)
+        dataset["validation"] = Processor().get_dev_examples(args.data_dir)
+        dataset["test"] = Processor().get_test_examples(args.data_dir)
+        class_labels = Processor().get_labels()
+        scriptsbase = "TextClassification/"
+        scriptformat = "txt"
+        max_seq_l = 480
+        if args.tune_plm:
+            batchsize_t = 4
+            batchsize_e = 4
+            gradient_accumulation_steps = 8
+            model_parallelize = True
+        else:
+            batchsize_t = 8
+            batchsize_e = 4
+            gradient_accumulation_steps = 4
+            model_parallelize = False
     
         
         
@@ -347,7 +368,7 @@ def evaluate(prompt_model, dataloader, desc):
 
     for step, inputs in enumerate(dataloader):
         if use_cuda:
-            inputs = inputs.to("cuda:1")
+            inputs = inputs.to("cuda:0")
         logits = prompt_model(inputs)
         labels = inputs["label"]
         alllabels.extend(labels.cpu().tolist())
@@ -420,7 +441,7 @@ if __name__ == "__main__":
         plm_eval_mode=args.plm_eval_mode,
     )
     if use_cuda:
-        prompt_model = prompt_model.to("cuda:1")
+        prompt_model = prompt_model.to("cuda:0")
         print(prompt_model.device)
 
     if model_parallelize:
@@ -558,7 +579,7 @@ if __name__ == "__main__":
         for step, inputs in enumerate(train_dataloader):
             if use_cuda:
                 #inputs_copy = InputFeatures(**inputs.to_dict()).cuda()
-                inputs = inputs.to("cuda:1")
+                inputs = inputs.to("cuda:0")
             tot_train_time -= time.time()
             logits = prompt_model(inputs)
             labels = inputs["label"]
